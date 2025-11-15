@@ -1,7 +1,9 @@
 import crypto from "crypto";
 import User from "../models/userModel.js";
 import Chatroom from "../models/chatroomModel.js";
+import Message from "../models/messageModel.js";
 import { v2 as cloudinary } from "cloudinary";
+import streamifier from "streamifier";
 
 
 cloudinary.config({
@@ -122,25 +124,50 @@ export const getUserChatrooms = async (req, res) => {
 };
 
 
+
 export const uploadFile = async (req, res) => {
     try {
-        const result = await cloudinary.uploader.upload_stream(
+        if (!req.file) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const uploadStream = cloudinary.uploader.upload_stream(
             { resource_type: "auto" },
             (error, result) => {
-                if (error) return res.status(500).json(error);
-                res.json({ url: result.secure_url });
+                if (error) {
+                    console.error("Cloudinary upload error:", error);
+                    return res.status(500).json({ message: "Upload failed" });
+                }
+
+                return res.status(200).json({
+                    url: result.secure_url,
+                    public_id: result.public_id,
+                });
             }
         );
+
+        // Convert buffer to stream and pipe into Cloudinary upload stream
+        streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error("Server error:", error);
+        return res.status(500).json({ message: error.message });
     }
 };
+
 
 
 export const saveSubscription = async (req, res) => {
     try {
         const userId = req.user; // assuming authentication middleware
         const subscription = req.body;
+
+        if (!subscription) {
+            return res.status(400).json({
+                success: false,
+                message: "Subscription is required"
+            });
+        }
 
         await User.findByIdAndUpdate(userId, { subscription });
 
@@ -153,6 +180,102 @@ export const saveSubscription = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to save subscription"
+        });
+    }
+};
+
+
+
+// Get all messages for a specific chatroom
+export const getRoomMessages = async (req, res) => {
+    try {
+        const { roomId } = req.params;
+
+        // Check if the chatroom exists
+        const chatroom = await Chatroom.findById(roomId);
+        if (!chatroom) {
+            return res.status(404).json({
+                success: false,
+                message: "Chatroom not found"
+            });
+        }
+
+        // Check if user is a member of the chatroom
+        if (!chatroom.members.includes(req.user._id)) {
+            return res.status(403).json({
+                success: false,
+                message: "Access denied. You are not a member of this chatroom"
+            });
+        }
+
+        // Fetch messages for the room, populated with sender info
+        const messages = await Message.find({ chatroom: roomId })
+            .populate('sender', 'userName profilePhoto')
+            .sort({ createdAt: 1 })
+            .exec();
+
+        // Transform profilePhoto to avatar for frontend compatibility
+        const transformedMessages = messages.map(message => ({
+            ...message.toObject(),
+            sender: {
+                ...message.sender.toObject(),
+                avatar: message.sender.profilePhoto // Rename here
+            }
+        }));
+
+        res.status(200).json({
+            success: true,
+            messages: transformedMessages
+        });
+    } catch (error) {
+        console.error("Get room messages error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error while fetching messages"
+        });
+    }
+};
+
+
+// Get latest messages (for preview)
+export const getLatestMessages = async (req, res) => {
+    try {
+        const { roomId } = req.params;
+        const limit = parseInt(req.query.limit) || 10;
+
+        // Check if the chatroom exists
+        const chatroom = await Chatroom.findById(roomId);
+        if (!chatroom) {
+            return res.status(404).json({
+                success: false,
+                message: "Chatroom not found"
+            });
+        }
+
+        // Check if user is a member of the chatroom
+        if (!chatroom.members.includes(req.user._id)) {
+            return res.status(403).json({
+                success: false,
+                message: "Access denied. You are not a member of this chatroom"
+            });
+        }
+
+        // Fetch latest messages
+        const messages = await Message.find({ chatroom: roomId })
+            .populate('sender', 'userName profilePhoto')
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .exec();
+
+        res.status(200).json({
+            success: true,
+            messages: messages.reverse() // Reverse to get chronological order
+        });
+    } catch (error) {
+        console.error("Get latest messages error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error while fetching latest messages"
         });
     }
 };
