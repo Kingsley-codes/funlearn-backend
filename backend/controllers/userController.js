@@ -1,6 +1,7 @@
 import User from "../models/userModel.js";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
+import UserScore from "../models/userScoreModel.js";
 
 
 
@@ -89,7 +90,11 @@ export const getUserProfile = async (req, res) => {
             });
         }
 
-        const rankInfo = getRankInfo(user.overallScore || 0);
+        const userScore = await UserScore.findOne({ user: userId });
+
+
+        const rankInfo = getRankInfo(userScore.overallScore);
+        console.log("Rank Info:", userScore.overallScore);
         res.json({
             success: true,
             user,

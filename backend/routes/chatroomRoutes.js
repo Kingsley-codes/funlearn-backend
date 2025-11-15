@@ -4,7 +4,9 @@ import {
     joinChatroom,
     getUserChatrooms,
     uploadFile,
-    saveSubscription
+    saveSubscription,
+    getRoomMessages,
+    getLatestMessages
 } from "../controllers/chatroomController.js";
 import { userAuthenticate } from "../middleware/authenticationMiddleware.js";
 import { upload } from "../middleware/uploadMiddleware.js";
@@ -16,6 +18,9 @@ chatroomRouter.post("/join/:token", userAuthenticate, joinChatroom);
 chatroomRouter.get("/", userAuthenticate, getUserChatrooms);
 chatroomRouter.post("/upload", userAuthenticate, upload.single("file"), uploadFile);
 chatroomRouter.post("/subscribe", userAuthenticate, saveSubscription);
+chatroomRouter.get("/messages/:roomId", userAuthenticate, getRoomMessages);
+chatroomRouter.get("/messages/:roomId/latest", userAuthenticate, getLatestMessages);
+
 
 
 export default chatroomRouter;

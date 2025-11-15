@@ -345,6 +345,35 @@ export const resendResetCode = async (req, res) => {
 };
 
 
+// Get current user profile
+export const getCurrentUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
 
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      user: {
+        _id: user._id,
+        userName: user.userName,
+        avatar: user.profilePhoto,
+        subscription: user.subscription, // For push notifications
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error("Get current user error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching user data"
+    });
+  }
+};
 
 

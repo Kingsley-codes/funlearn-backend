@@ -94,6 +94,7 @@ export const getQuestionSet = async (req, res) => {
     }
 };
 
+
 export const getAllQuestionSets = async (req, res) => {
     try {
         const userID = req.user;
@@ -103,8 +104,82 @@ export const getAllQuestionSets = async (req, res) => {
                 message: "You are Unauthorized"
             });
         }
-        // Find all question sets for the user
-        const questionSets = await QuestionSet.find({ users: userID }).select("topic _id");
+
+        const questionSets = await QuestionSet.aggregate([
+            // Match question sets for the current user
+            { $match: { users: new mongoose.Types.ObjectId(userID) } },
+
+            // Lookup user scores
+            {
+                $lookup: {
+                    from: "userscores",
+                    let: { questionSetId: "$_id" },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ["$user", new mongoose.Types.ObjectId(userID)] },
+                                        { $in: ["$$questionSetId", "$question.questionSet"] }
+                                    ]
+                                }
+                            }
+                        },
+                        { $unwind: "$question" },
+                        {
+                            $match: {
+                                $expr: { $eq: ["$question.questionSet", "$$questionSetId"] }
+                            }
+                        },
+                        {
+                            $project: {
+                                score: "$question.score",
+                                _id: 0
+                            }
+                        }
+                    ],
+                    as: "userScores"
+                }
+            },
+
+            // Add computed fields
+            {
+                $addFields: {
+                    totalEasyQuestions: {
+                        $size: { $ifNull: ["$questions.easyQuestions.list", []] }
+                    },
+                    totalHardQuestions: {
+                        $size: { $ifNull: ["$questions.hardQuestions.list", []] }
+                    },
+                    userScore: {
+                        $ifNull: [{ $arrayElemAt: ["$userScores.score", 0] }, 0]
+                    }
+                }
+            },
+
+            // Calculate total questions
+            {
+                $addFields: {
+                    totalQuestions: {
+                        $add: ["$totalEasyQuestions", "$totalHardQuestions"]
+                    }
+                }
+            },
+
+            // Project final fields
+            {
+                $project: {
+                    topic: 1,
+                    totalQuestions: 1,
+                    userScore: 1,
+                    easyQuestionsCount: "$totalEasyQuestions",
+                    hardQuestionsCount: "$totalHardQuestions",
+                    createdAt: 1,
+                    updatedAt: 1
+                }
+            }
+        ]);
+
         res.status(200).json({
             success: true,
             questionSets

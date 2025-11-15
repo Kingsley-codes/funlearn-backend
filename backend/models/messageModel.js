@@ -13,7 +13,6 @@ const messageSchema = new mongoose.Schema({
     fileUrl: { type: String },  // If it's an uploaded image/PDF
     fileType: {
         type: String,
-        enum: ["image", "pdf", null],
         default: null
     },
     createdAt: { type: Date, default: Date.now }

@@ -6,7 +6,9 @@ import {
     verifyResetCode,
     resetPassword,
     resendResetCode,
+    getCurrentUser,
 } from "../controllers/userAuthController.js";
+import { userAuthenticate } from "../middleware/authenticationMiddleware.js";
 
 const userAuthRouter = express.Router();
 
@@ -15,6 +17,8 @@ userAuthRouter.post("/register", registerUser); // Step 2: Register user with fo
 
 // User Login route
 userAuthRouter.post("/login", login);
+userAuthRouter.get("/me", userAuthenticate, getCurrentUser);
+
 
 // Password reset routes
 userAuthRouter.post('/forgot-password', requestPasswordReset); // Stage 1
