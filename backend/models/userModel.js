@@ -63,7 +63,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "Beginner",
       enum: [
-        "Brain Sprout 🌱", "Curious Thinker 🔍", "Knowledge Explorer 🧭", "Idea Spark 💡",
+        "Beginner", "Brain Sprout 🌱", "Curious Thinker 🔍", "Knowledge Explorer 🧭", "Idea Spark 💡",
         "Mind Mover 🌀", "Quiz Challenger 🎯", "Concept Crusher 💥", "Sharp Scholar 📘",
         "Logic Builder 🧩", "Insight Seeker 🔮", "Wisdom Warrior ⚔️", "Genius Guru 🧙‍♂️",
         "Study Strategist 🧠", "Mind Master 👑", "Genius Grove 🌳", "Brainstorm Pro ☁️",
