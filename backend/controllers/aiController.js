@@ -37,16 +37,21 @@ export const handleAIChat = async (req, res) => {
             return res.status(400).json({ error: "Message or file text is required" });
         }
 
-        // ✅ Handle fileText-only requests for document summarization
-        const isDocumentSubmission = fileText && !message;
+        // ✅ DETECT EXPLICIT SUMMARIZATION REQUESTS
+        const isExplicitSummarizationRequest =
+            (message && isSummarizationRequest(message)) ||
+            action === "summarize";
+
+        // ✅ Handle fileText with explicit summarization request
+        const shouldForceSummarization = fileText && isExplicitSummarizationRequest;
 
         // ✅ Build final message text
         let combinedMessage = "";
         if (fileText && message) {
             combinedMessage = `${message}\n\n[Attached Document Content]\n${fileText}`;
-        } else if (isDocumentSubmission) {
+        } else if (fileText && !message) {
             combinedMessage = fileText;
-            // Force summarization action for document-only submissions
+            // Force summarization for document-only submissions
             action = "summarize";
         } else {
             combinedMessage = message;
@@ -59,7 +64,7 @@ export const handleAIChat = async (req, res) => {
         if (!context) {
             let conversationTitle = "New Conversation";
 
-            if (isDocumentSubmission) {
+            if (fileText) {
                 conversationTitle = await generateContentBasedTitle(fileText);
             } else if (message) {
                 conversationTitle = await generateConversationTitle(message);
@@ -77,15 +82,15 @@ export const handleAIChat = async (req, res) => {
             console.log("🆕 New conversation created:", context._id, "📄 Title:", conversationTitle);
         }
 
-        // ✅ Handle document submission (fileText only) - IMMEDIATE SUMMARIZATION
-        if (isDocumentSubmission && !context.hasSummary) {
+        // ✅ Handle document submission with explicit summarization request
+        if (shouldForceSummarization && !context.hasSummary) {
             context.originalText = fileText;
             context.hasSummary = true;
 
             // Generate and save chat context for the document
             const generatedContext = await generateChatContextAI("", fileText);
             context.chatContext = generatedContext;
-            console.log("📄 Document context set:", generatedContext);
+            console.log("📄 Document context set with explicit summarization request");
 
             // Store in Pinecone for RAG
             ragService
@@ -114,17 +119,20 @@ export const handleAIChat = async (req, res) => {
             // ✅ Call Groq API for summarization
             const fullResponse = await callGroqAPI(messagesForAPI);
 
+            // ✅ Clean the response
+            const cleanResponse = cleanAIResponse(fullResponse);
+
             // ✅ Store conversation in DB
             context.conversation.push(
-                { role: "user", content: "[Document Uploaded for Analysis]" },
-                { role: "assistant", content: fullResponse }
+                { role: "user", content: `[User Request: ${message}]\n\n[Document Uploaded for Analysis]` },
+                { role: "assistant", content: cleanResponse }
             );
             await context.save();
 
             // ✅ Store AI response in RAG memory
-            if (fullResponse.length > 50) {
+            if (cleanResponse.length > 50) {
                 ragService
-                    .storeConversationChunks(context._id.toString(), fullResponse, {
+                    .storeConversationChunks(context._id.toString(), cleanResponse, {
                         type: "assistant_response",
                         userID: userID.toString(),
                     })
@@ -135,7 +143,77 @@ export const handleAIChat = async (req, res) => {
             return res.status(200).json({
                 success: true,
                 data: {
-                    response: fullResponse,
+                    response: cleanResponse,
+                    chatId: context._id,
+                    title: context.title,
+                    isNewConversation,
+                    isDocumentSummary: true,
+                },
+            });
+        }
+
+        // ✅ Handle fileText-only submissions (existing behavior)
+        if (fileText && !message && !context.hasSummary) {
+            context.originalText = fileText;
+            context.hasSummary = true;
+
+            // Generate and save chat context for the document
+            const generatedContext = await generateChatContextAI("", fileText);
+            context.chatContext = generatedContext;
+            console.log("📄 Document context set for fileText-only submission");
+
+            // Store in Pinecone for RAG
+            ragService
+                .storeConversationChunks(context._id.toString(), fileText, {
+                    type: "original_content",
+                    userID: userID.toString(),
+                })
+                .catch((error) => console.error("Failed to store in Pinecone:", error));
+
+            if (isNewConversation) {
+                context.title = await generateContentBasedTitle(fileText);
+            }
+
+            await context.save();
+
+            // ✅ Generate immediate summarization prompt for document
+            const finalPrompt = await craftDocumentSummarizationPrompt(fileText, context);
+
+            // ✅ Build message array for model
+            const messagesForAPI = [];
+            messagesForAPI.push({
+                role: "user",
+                content: finalPrompt,
+            });
+
+            // ✅ Call Groq API for summarization
+            const fullResponse = await callGroqAPI(messagesForAPI);
+
+            // ✅ Clean the response
+            const cleanResponse = cleanAIResponse(fullResponse);
+
+            // ✅ Store conversation in DB
+            context.conversation.push(
+                { role: "user", content: "[Document Uploaded for Analysis]" },
+                { role: "assistant", content: cleanResponse }
+            );
+            await context.save();
+
+            // ✅ Store AI response in RAG memory
+            if (cleanResponse.length > 50) {
+                ragService
+                    .storeConversationChunks(context._id.toString(), cleanResponse, {
+                        type: "assistant_response",
+                        userID: userID.toString(),
+                    })
+                    .catch(console.error);
+            }
+
+            // ✅ Return structured response
+            return res.status(200).json({
+                success: true,
+                data: {
+                    response: cleanResponse,
                     chatId: context._id,
                     title: context.title,
                     isNewConversation,
@@ -145,9 +223,9 @@ export const handleAIChat = async (req, res) => {
         }
 
         // ✅ Handle first content submission (file or long text) for mixed content
-        if (!context.hasSummary && !isDocumentSubmission) {
+        if (!context.hasSummary && !fileText) {
             if (isLikelyContentSubmission(combinedMessage)) {
-                context.originalText = fileText || message;
+                context.originalText = message;
                 context.hasSummary = true;
 
                 // ✅ Generate and save chat context if not set
@@ -158,22 +236,30 @@ export const handleAIChat = async (req, res) => {
                 }
 
                 ragService
-                    .storeConversationChunks(context._id.toString(), fileText || message, {
+                    .storeConversationChunks(context._id.toString(), message, {
                         type: "original_content",
                         userID: userID.toString(),
                     })
                     .catch((error) => console.error("Failed to store in Pinecone:", error));
 
                 if (isNewConversation) {
-                    context.title = await generateContentBasedTitle(fileText || message);
+                    context.title = await generateContentBasedTitle(message);
                 }
 
                 await context.save();
             }
         }
 
+        // ✅ For cases with both fileText and message but not summarization request
+        // Let it flow through normal conversation processing
+
         // ✅ Craft final prompt (RAG + context-aware)
-        const finalPrompt = await craftIntelligentPrompt(combinedMessage, context, action, isDocumentSubmission);
+        const finalPrompt = await craftIntelligentPrompt(
+            combinedMessage,
+            context,
+            action,
+            shouldForceSummarization
+        );
 
         // ✅ Build message array for model
         const messagesForAPI = [];
@@ -236,6 +322,7 @@ export const handleAIChat = async (req, res) => {
         }
     }
 };
+
 
 
 export const callGroqAPI = async (messages) => {

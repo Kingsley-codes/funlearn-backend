@@ -70,7 +70,7 @@ export const cleanAIResponse = (response) => {
 // ✅ Enhanced prompt crafting with RAG
 export const craftIntelligentPrompt = async (message, context, action, isDocumentSubmission = false) => {
     // ✅ Handle pleasantries first
-    if (isPleasantry(message)) {
+    if (isPleasantry(message) && !isSummarizationRequest(message)) {
         return `The user said: "${message}". 
         
         Please respond naturally and warmly to this greeting or pleasantry. Keep it friendly, engaging, and appropriate for the context. 
@@ -80,8 +80,8 @@ export const craftIntelligentPrompt = async (message, context, action, isDocumen
     }
 
 
-    // ✅ Handle explicit summarization requests
-    if (action === 'summarize' || isDocumentSubmission) {
+    // ✅ Handle explicit summarization requests (including those with fileText)
+    if (action === 'summarize' || isDocumentSubmission || isSummarizationRequest(message)) {
         const contentToSummarize = context.originalText || message;
 
         return `Please analyze and summarize the following content. Provide a comprehensive summary with:
@@ -325,6 +325,21 @@ export const generateChatContextAI = async (message, fileText) => {
     }
 };
 
+
+// ✅ NEW: Function to detect summarization requests
+export const isSummarizationRequest = (message) => {
+    if (!message) return false;
+
+    const summarizationKeywords = [
+        'summarize', 'summary', 'summarise', 'summarization',
+        'brief', 'overview', 'main points', 'key points',
+        'tl;dr', 'tldr', 'recap', 'outline',
+        'explain briefly', 'give me a summary', 'what are the main ideas'
+    ];
+
+    const cleanMessage = message.toLowerCase().trim();
+    return summarizationKeywords.some(keyword => cleanMessage.includes(keyword));
+};
 
 export const callGroqAPI = async (messages, options = {}) => {
     const {
