@@ -11,7 +11,8 @@ import {
     craftIntelligentPrompt,
     generateChatContextAI,
     cleanAIResponse,
-    craftDocumentSummarizationPrompt
+    craftDocumentSummarizationPrompt,
+    isSummarizationRequest
 } from "../utils/aiHelpers.js";
 
 
