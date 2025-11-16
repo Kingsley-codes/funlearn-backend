@@ -172,6 +172,7 @@ export const getAllQuestionSets = async (req, res) => {
                     topic: 1,
                     totalQuestions: 1,
                     userScore: 1,
+                    inviteToken: 1,
                     easyQuestionsCount: "$totalEasyQuestions",
                     hardQuestionsCount: "$totalHardQuestions",
                     createdAt: 1,
@@ -200,7 +201,7 @@ export const addUserToQuestionSet = async (req, res) => {
         const userID = req.user; // Auth middleware attaches userID
 
         // Validate questionSetId
-        if (!questionSetId || !mongoose.Types.ObjectId.isValid(questionSetId)) {
+        if (!questionSetId) {
             return res.status(400).json({
                 success: false,
                 message: "Valid question set ID is required",
@@ -215,7 +216,7 @@ export const addUserToQuestionSet = async (req, res) => {
         }
 
         // Get the question set first
-        const questionSet = await QuestionSet.findById(questionSetId);
+        const questionSet = await QuestionSet.findOne({ inviteToken: questionSetId });
 
         if (!questionSet) {
             return res.status(404).json({

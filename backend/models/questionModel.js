@@ -50,6 +50,7 @@ const questionGroupSchema = new mongoose.Schema(
 const questionSetSchema = new mongoose.Schema(
     {
         topic: { type: String, required: true },
+        inviteToken: { type: String, required: true, unique: true },
         users: [
             {
                 type: mongoose.Schema.Types.ObjectId,

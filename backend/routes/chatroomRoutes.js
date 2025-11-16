@@ -6,7 +6,8 @@ import {
     uploadFile,
     saveSubscription,
     getRoomMessages,
-    getLatestMessages
+    getLatestMessages,
+    exitChatroom
 } from "../controllers/chatroomController.js";
 import { userAuthenticate } from "../middleware/authenticationMiddleware.js";
 import { upload } from "../middleware/uploadMiddleware.js";
@@ -20,6 +21,7 @@ chatroomRouter.post("/upload", userAuthenticate, upload.single("file"), uploadFi
 chatroomRouter.post("/subscribe", userAuthenticate, saveSubscription);
 chatroomRouter.get("/messages/:roomId", userAuthenticate, getRoomMessages);
 chatroomRouter.get("/messages/:roomId/latest", userAuthenticate, getLatestMessages);
+chatroomRouter.post("/exit", userAuthenticate, exitChatroom);
 
 
 

@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { Conversation } from '../models/aiChatModel.js';
 import QuestionSet from "../models/questionModel.js";
+import crypto from 'crypto';
 import { ragService } from '../utils/ragService.js';
 import mongoose from 'mongoose';
 import {
@@ -509,15 +510,17 @@ ${relatedText.slice(0, 1800)}
             parsed.hardQuestions = { difficulty: "hard", list: [] };
         }
 
-        // Log what we found
-        console.log(`Found ${parsed.easyQuestions.list.length} easy questions`);
-        console.log(`Found ${parsed.hardQuestions.list.length} hard questions`);
+
+        const token = crypto.randomBytes(6).toString("hex");
+
 
         // 6️⃣ Save to MongoDB
         const newSet = await QuestionSet.create({
             topic,
             context: relatedText.slice(0, 2000),
             users: [userId],
+            inviteToken: token,
+            createdBy: userId,
             questions: {
                 easyQuestions: parsed.easyQuestions,
                 hardQuestions: parsed.hardQuestions,

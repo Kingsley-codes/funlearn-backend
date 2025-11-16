@@ -36,6 +36,29 @@ export const createChatroom = async (req, res) => {
 };
 
 
+export const exitChatroom = async (req, res) => {
+    try {
+        const { roomId } = req.body;
+        const userId = req.user;
+        if (!userId) {
+            return res.status(403).json({
+                success: false,
+                message: "You are Unauthorized",
+            });
+        }
+        // Remove user from chatroom members
+        await Chatroom.findByIdAndUpdate(roomId, { $pull: { members: userId } });
+
+        // Remove chatroom from user's list
+        await User.findByIdAndUpdate(userId, { $pull: { chatrooms: roomId } });
+
+        res.json({ success: true, message: "Exited chatroom successfully" });
+    } catch (error) {
+        console.error("❌ Exit chatroom failed:", error);
+        res.status(500).json({ success: false, message: error.message || "Something went wrong" });
+    }
+};
+
 
 export const joinChatroom = async (req, res) => {
     try {
