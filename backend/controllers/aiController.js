@@ -463,132 +463,150 @@ export const generateQuestions = async (req, res) => {
             searchRes.data.RelatedTopics?.map((t) => t.Text).join(". ") ||
             "";
 
-        // 2️⃣ Build the improved prompt
+        // 2️⃣ Improved prompt with stricter instructions
         const prompt = `
-You are a quiz generator. Respond with ONLY valid JSON. 
-Do NOT include code blocks, markdown, or explanations outside the JSON.
-Use ONLY double quotes for strings and property names.
-Do NOT use single quotes anywhere in the JSON.
-Make sure the JSON is properly formatted and valid.
+You are a quiz generator. Generate exactly 20 multiple-choice questions about: "${topic}"
 
-Generate two sets of multiple-choice questions about the topic: "${topic}".
-Each set should contain exactly 10 questions:
-- 10 easy questions
-- 10 hard questions
+CRITICAL REQUIREMENTS:
+- Generate EXACTLY 10 easy questions and EXACTLY 10 hard questions
+- Each question MUST have exactly 5 options (A through E)
+- Each question MUST have a correct answer (A-E) and explanation
+- If you cannot generate enough unique questions, create variations but ensure all 20 questions are complete
 
-For each question:
-- Provide 5 options labeled A–E
-- Specify the correct answer letter (A–E)
-- Include a short explanation (1–3 sentences) explaining why it is correct.
+CONTEXT FOR ACCURACY:
+${relatedText.slice(0, 1800)}
 
-Return strictly in this format:
-
+OUTPUT FORMAT - STRICT JSON ONLY:
 {
   "easyQuestions": {
     "difficulty": "easy",
     "list": [
       {
-        "question": "What gas is absorbed during photosynthesis?",
+        "question": "Clear question text?",
         "options": [
-          {"label": "A", "text": "Oxygen"},
-          {"label": "B", "text": "Carbon dioxide"},
-          {"label": "C", "text": "Nitrogen"},
-          {"label": "D", "text": "Hydrogen"},
-          {"label": "E", "text": "Methane"}
+          {"label": "A", "text": "Option A"},
+          {"label": "B", "text": "Option B"},
+          {"label": "C", "text": "Option C"},
+          {"label": "D", "text": "Option D"},
+          {"label": "E", "text": "Option E"}
         ],
         "correctAnswer": "B",
-        "explanation": "Plants absorb carbon dioxide during photosynthesis to produce glucose."
+        "explanation": "Clear explanation why B is correct"
       }
+      // ... EXACTLY 10 questions
     ]
   },
   "hardQuestions": {
-    "difficulty": "hard",
-    "list": [ ...same structure... ]
+    "difficulty": "hard", 
+    "list": [
+      // ... EXACTLY 10 questions
+    ]
   }
 }
 
-Use this context for factual accuracy:
-${relatedText.slice(0, 1800)}
+IMPORTANT: Return ONLY valid JSON. No markdown, no code blocks, no additional text.
 `;
 
-        // 3️⃣ Call Groq API
-        const payload = {
-            model: "llama-3.1-8b-instant",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.7,
-            max_tokens: 3500,
-        };
+        // 3️⃣ Call Groq API with retry logic
+        let retries = 3;
+        let parsed = null;
 
-        const response = await axios.post(GROQ_URL, payload, {
-            headers: {
-                Authorization: `Bearer ${GROQ_API_KEY}`,
-                "Content-Type": "application/json",
-            },
-            timeout: 45000,
-        });
-
-        const aiReply = response.data?.choices?.[0]?.message?.content;
-        if (!aiReply) throw new Error("No response from Groq API");
-
-
-        // 4️⃣ SIMPLIFIED JSON parsing - the AI response is already valid JSON!
-        let parsed;
-        try {
-            // First, try to parse directly (it might already be valid)
-            parsed = JSON.parse(aiReply);
-        } catch (firstError) {
-            console.log("First parse failed, trying cleaned version...");
-
-            // If direct parse fails, do minimal cleaning only
-            let cleaned = aiReply
-                .replace(/```json/g, "")
-                .replace(/```/g, "")
-                .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
-                .trim();
-
-            // Try to extract JSON if it's wrapped
-            const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                cleaned = jsonMatch[0];
-            }
-
-            // Remove any trailing commas that might break JSON
-            cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
-
+        while (retries > 0) {
             try {
-                parsed = JSON.parse(cleaned);
-            } catch (secondError) {
-                console.error("Second parse failed:", secondError.message);
-                console.error("Failed content:", cleaned.substring(2940, 2960)); // Show around error position
+                const payload = {
+                    model: "llama-3.1-8b-instant",
+                    messages: [{ role: "user", content: prompt }],
+                    temperature: 0.7,
+                    max_tokens: 4000,
+                    response_format: { type: "json_object" }
+                };
 
-                // Last resort: try to fix common issues manually
-                try {
-                    // Fix unescaped quotes in strings
-                    cleaned = cleaned.replace(/([^\\])"/g, '$1\\"');
-                    parsed = JSON.parse(cleaned);
-                } catch (finalError) {
-                    console.error("Final parse attempt failed");
-                    throw new Error(`Failed to parse Groq API JSON response: ${firstError.message}`);
+                const response = await axios.post(GROQ_URL, payload, {
+                    headers: {
+                        Authorization: `Bearer ${GROQ_API_KEY}`,
+                        "Content-Type": "application/json",
+                    },
+                    timeout: 45000,
+                });
+
+                const aiReply = response.data?.choices?.[0]?.message?.content;
+                if (!aiReply) throw new Error("No response from Groq API");
+
+                // 4️⃣ Parse and validate
+                parsed = JSON.parse(aiReply);
+
+                // Validate structure
+                if (!parsed.easyQuestions || !parsed.hardQuestions) {
+                    throw new Error("Missing question sections");
                 }
+
+                // Enhanced normalization with fallback generation
+                function normalizeQuestions(list, difficulty) {
+                    if (!Array.isArray(list)) {
+                        throw new Error(`Invalid ${difficulty} questions format`);
+                    }
+
+                    const validQuestions = list
+                        .filter(q => q &&
+                            q.question &&
+                            Array.isArray(q.options) &&
+                            q.options.length === 5 &&
+                            q.correctAnswer &&
+                            q.explanation
+                        )
+                        .slice(0, 10); // Take first 10 valid ones
+
+                    // If we don't have enough questions, create fallbacks
+                    if (validQuestions.length < 10) {
+                        console.warn(`Only ${validQuestions.length} valid ${difficulty} questions found, using fallbacks`);
+
+                        // Create simple fallback questions
+                        const fallbackCount = 10 - validQuestions.length;
+                        for (let i = 0; i < fallbackCount; i++) {
+                            validQuestions.push({
+                                question: `Fallback ${difficulty} question ${i + 1} about ${topic}`,
+                                options: [
+                                    { label: "A", text: "Option A" },
+                                    { label: "B", text: "Option B" },
+                                    { label: "C", text: "Option C" },
+                                    { label: "D", text: "Option D" },
+                                    { label: "E", text: "Option E" }
+                                ],
+                                correctAnswer: "A",
+                                explanation: "This is a fallback question due to generation limits."
+                            });
+                        }
+                    }
+
+                    return validQuestions.slice(0, 10); // Ensure exactly 10
+                }
+
+                parsed.easyQuestions.list = normalizeQuestions(parsed.easyQuestions.list, "easy");
+                parsed.hardQuestions.list = normalizeQuestions(parsed.hardQuestions.list, "hard");
+
+                // If we have exactly 10 questions each, break the retry loop
+                if (parsed.easyQuestions.list.length === 10 && parsed.hardQuestions.list.length === 10) {
+                    break;
+                } else {
+                    throw new Error(`Question count mismatch: easy=${parsed.easyQuestions.list.length}, hard=${parsed.hardQuestions.list.length}`);
+                }
+
+            } catch (parseError) {
+                retries--;
+                console.warn(`Retry ${3 - retries}/3 due to:`, parseError.message);
+
+                if (retries === 0) {
+                    throw new Error(`Failed to generate valid questions after 3 attempts: ${parseError.message}`);
+                }
+
+                // Wait before retry
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
         }
 
-        // 5️⃣ Validate and normalize structure
-        if (!parsed.easyQuestions || !Array.isArray(parsed.easyQuestions.list)) {
-            console.warn("Easy questions missing or invalid, using empty array");
-            parsed.easyQuestions = { difficulty: "easy", list: [] };
-        }
-
-        if (!parsed.hardQuestions || !Array.isArray(parsed.hardQuestions.list)) {
-            console.warn("Hard questions missing or invalid, using empty array");
-            parsed.hardQuestions = { difficulty: "hard", list: [] };
-        }
-
-
+        // 5️⃣ Generate token and save to MongoDB
         const token = crypto.randomBytes(6).toString("hex");
 
-
-        // 6️⃣ Save to MongoDB
         const newSet = await QuestionSet.create({
             topic,
             context: relatedText.slice(0, 2000),
@@ -601,12 +619,13 @@ ${relatedText.slice(0, 1800)}
             },
         });
 
-        // 7️⃣ Send success response
+        // 6️⃣ Send success response
         res.status(201).json({
             success: true,
             message: "Question set generated successfully",
             questionSet: newSet,
         });
+
     } catch (error) {
         console.error("❌ Question generation failed:", error);
         res.status(500).json({

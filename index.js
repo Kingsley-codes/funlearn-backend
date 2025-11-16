@@ -13,6 +13,8 @@ import { initPinecone } from './backend/scripts/initPinecone.js';
 import questionsRouter from './backend/routes/questionsRoutes.js';
 import leaderBoardRouter from './backend/routes/leaderBoardRoutes.js';
 import userRouter from './backend/routes/userRoutes.js';
+import cron from "node-cron";
+import axios from "axios";
 import { scheduleWeeklyReset } from './backend/controllers/leaderBoardController.js';
 
 
@@ -31,6 +33,52 @@ const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 
 scheduleWeeklyReset();
+
+
+const apis = [
+    "https://help-a-child-africa.onrender.com",
+    "https://drivenest-se33.onrender.com",
+    "https://forever-backend-w1tn.onrender.com",
+    "https://blog-backend-dav9.onrender.com"
+];
+
+let nextRunInMinutes = getRandomMinutes();
+let counter = 0;
+
+function getRandomMinutes() {
+    return Math.floor(Math.random() * (14 - 10 + 1)) + 10; // 10–14
+}
+
+async function callApis() {
+    try {
+        console.log("⏳ Calling APIs...");
+
+        for (const url of apis) {
+            try {
+                const res = await axios.get(url);
+                console.log(`✓ ${url} =>`, res.status);
+            } catch (err) {
+                console.log(`✗ ${url} failed`, err.message);
+            }
+        }
+
+    } catch (err) {
+        console.error("Main error:", err);
+    }
+}
+
+// Runs every 1 minute
+cron.schedule("* * * * *", async () => {
+    counter++;
+
+    if (counter >= nextRunInMinutes) {
+        await callApis();
+        counter = 0;
+        nextRunInMinutes = getRandomMinutes();
+        console.log("Next run in:", nextRunInMinutes, "minutes");
+    }
+});
+
 
 // Use separate file for socket events
 chatSocket(io);
