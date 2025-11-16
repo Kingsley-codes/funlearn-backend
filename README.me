@@ -1,0 +1,242 @@
+# Funlearn - Learning Made Fun! 🎓✨
+
+Funlearn is an innovative educational platform designed to make learning engaging and enjoyable for students through AI-powered tools, gamified quizzes, and collaborative chatrooms.
+
+### Live Applications
+- **Frontend**: [https://funlearn-frontend.vercel.app](https://funlearn-frontend.vercel.app)
+- **Backend**: [https://funlearn-backend-f3cg.onrender.com](https://funlearn-backend-f3cg.onrender.com)
+
+## 👥 Team
+
+- **Frontend Development**: [josseycodes1](https://github.com/josseycodes1)
+- **Backend Development**: [Kingsley-codes](https://github.com/Kingsley-codes)
+
+## 🌟 Features
+
+### 🤖 AI-Powered Learning Assistant
+- **Document Analysis**: Upload and analyze study materials
+- **Smart Summarization**: Get concise explanations in bullet points
+- **Resource Recommendations**: Receive curated online learning materials
+- **Interactive Chat**: Engage in meaningful conversations with AI tutor
+
+### 🎯 Gamified Quiz System
+- **Dual Difficulty Levels**: Easy and Hard question sets
+- **Progress Tracking**: Monitor your learning journey
+- **Score System**: Earn points and climb the leaderboard
+- **Rank Progression**: Advance through 21 unique achievement levels
+
+### 💬 Collaborative Chatrooms
+- **Group Study Sessions**: Create and join study rooms
+- **Real-time Messaging**: Instant communication with peers
+- **File Sharing**: Exchange study materials seamlessly
+- **Automatic Friend System**: Connect with fellow learners automatically
+
+### 🏆 Competitive Elements
+- **Global Leaderboard**: Compete with all platform users
+- **Friends Leaderboard**: Challenge your study buddies
+- **Weekly Resets**: Fresh competition every week
+- **Rank System**: From "Beginner" to "Sync Sage 🔱"
+
+## 🛠 Tech Stack
+
+### Frontend
+- **Framework**: Next.js
+- **Styling**: Tailwind CSS
+- **Colors**: Lilac, White, and Black theme
+- **Deployment**: Vercel 
+
+### Backend
+- **Runtime**: Node.js with Express
+- **Database**: MongoDB with Mongoose
+- **Real-time**: Socket.io
+- **AI Integration**: Groq API
+- **File Storage**: Cloudinary
+- **Authentication**: JWT
+- **Deployment**: Render
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js (v18 or higher)
+- MongoDB Atlas or local instance
+- Groq API account
+
+### Installation
+
+1. **Clone the repositories**
+```bash
+# Frontend
+git clone https://github.com/josseycodes1/Funlearn-Frontend.git
+cd Funlearn-Frontend
+
+# Backend
+git clone https://github.com/Kingsley-codes/funlearn-backend.git
+cd funlearn-backend
+```
+
+2. **Install dependencies**
+```bash
+# Both frontend and backend
+npm install
+```
+
+3. **Environment Configuration**
+
+Create `.env` files in both projects:
+
+**Backend (.env)**
+```env
+PORT=5000
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRES_IN=7d
+GROQ_URL=https://api.groq.com/openai/v1/chat/completions
+GROQ_API_KEY=your_groq_api_key
+CLOUDINARY_CLOUD_NAME=your_cloudinary_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+FRONTEND_URL=https://funlearn-frontend.vercel.app
+VAPID_PUBLIC_KEY=your_vapid_public_key
+VAPID_PRIVATE_KEY=your_vapid_private_key
+VAPID_EMAIL=mailto:your_email
+PINECONE_API_KEY=your_pinecone_api_key
+PINECONE_INDEX_NAME=ai-chat-vectors
+```
+
+**Frontend (.env.local)**
+```env
+NEXT_PUBLIC_API_URL=https://funlearn-backend-f3cg.onrender.com
+```
+
+4. **Run the applications**
+```bash
+# Backend
+npm run server
+
+# Frontend
+npm run dev
+```
+
+## 📁 Project Structure
+
+### Backend Architecture
+```
+backend/
+├── controllers/          # Route handlers
+│   ├── aiController.js
+│   ├── chatroomController.js
+│   ├── leaderBoardController.js
+│   ├── questionsController.js
+│   └── userAuthController.js
+├── models/              # MongoDB schemas
+├── routes/              # Express routes
+├── middleware/          # Authentication & upload
+├── utils/               # Helper functions
+└── socket/              # Real-time communication
+```
+
+### Key Features Implementation
+
+#### AI Chat System
+- **RAG Integration**: Pinecone vector database for context-aware responses
+- **Conversation Management**: Persistent chat history with automatic titling
+- **File Processing**: Support for PDF, DOCX, and text file analysis
+
+#### Quiz Engine
+- **Dynamic Generation**: AI-powered question creation based on study topics
+- **Progressive Scoring**: Adaptive scoring system with rank thresholds
+- **Social Features**: Share question sets and compete with friends
+
+#### Real-time Chat
+- **WebSocket Integration**: Socket.io for instant messaging
+- **Push Notifications**: Browser notifications for new messages
+- **Media Support**: File uploads with Cloudinary integration
+
+## 🎮 Usage Guide
+
+### Getting Started
+1. **Sign Up**: Create your student account
+2. **Profile Setup**: Customize your learning preferences
+3. **Explore Features**: Try AI chat, create quizzes, or join chatrooms
+
+### AI Learning Assistant
+1. Upload study materials or start a conversation
+2. Get summarized explanations and key points
+3. Request additional learning resources
+4. Save important conversations for later review
+
+### Quiz System
+1. Generate quizzes from chat conversations or specific topics
+2. Challenge yourself with easy and hard difficulty levels
+3. Track your scores and progress through ranks
+4. Share quiz sets with friends for collaborative learning
+
+### Chatrooms
+1. Create study groups for specific subjects
+2. Invite friends using shareable tokens
+3. Collaborate in real-time with file sharing
+4. Build your learning network automatically
+
+## 🔗 API Documentation
+
+Complete API documentation available on Postman:
+[**View API Docs**](https://documenter.getpostman.com/view/41722320/2sB3WwoweG)
+
+### Key Endpoints
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User authentication
+- `POST /api/ai/chat` - AI conversation
+- `POST /api/ai/questions` - Generate quizzes
+- `POST /api/chatroom` - Create chatrooms
+- `GET /api/leaderboard` - Global rankings
+
+## 🎯 Gamification System
+
+### Rank Progression
+- **21 Unique Ranks**: From "Beginner" to "Sync Sage 🔱"
+- **Score Thresholds**: Progressive difficulty scaling
+- **Visual Badges**: Colorful rank indicators
+- **Motivational Messages**: Encouraging progression feedback
+
+### Scoring Mechanics
+- **Quiz Performance**: Points based on correct answers
+- **Weekly Challenges**: Reset every Sunday
+- **Overall Progress**: Lifetime achievement tracking
+- **Social Competition**: Compare with friends and global users
+
+## 🌐 Deployment
+
+### Deployment Notes
+- Frontend deployed on Vercel with automatic CI/CD
+- Backend deployed on Render with environment variables
+- MongoDB Atlas for cloud database
+- Cloudinary for media storage and optimization
+
+## 🤝 Contributing
+
+We welcome contributions! Please feel free to submit pull requests or open issues for bugs and feature requests.
+
+### Development Workflow
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the ISC License.
+
+
+## 📞 Support
+
+For support and questions:
+- Check the [API Documentation](https://documenter.getpostman.com/view/41722320/2sB3WwoweG))
+- Open an issue on GitHub
+- Contact the development team
+
+---
+
+**Funlearn** - Transforming education through engagement and technology! 🚀
+
+*Make learning fun, one quiz at a time!*

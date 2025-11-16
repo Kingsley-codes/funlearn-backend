@@ -1,86 +1,104 @@
 import axios from "axios";
 
 
-// ✅ Enhanced helper function to detect pleasantries
-export const isPleasantry = (text) => {
-    const pleasantries = [
-        'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
-        'how are you', 'how do you do', 'nice to meet you', 'greetings',
-        'thanks', 'thank you', 'appreciate it', 'thanks a lot',
-        'bye', 'goodbye', 'see you', 'farewell', 'have a good day'
-    ];
 
-    const cleanText = text.toLowerCase().trim();
-    return pleasantries.some(pleasantry => cleanText.includes(pleasantry));
+// ✅ Specialized prompt for document summarization
+export const craftDocumentSummarizationPrompt = async (fileText, context) => {
+    return `You have received a document for analysis. Please provide a comprehensive summary and analysis with the following structure:
+
+📚 DOCUMENT ANALYSIS
+
+📌 EXECUTIVE SUMMARY:
+Provide a 2-3 sentence overview of the main topic and purpose of this document.
+
+🎯 KEY POINTS:
+- Extract 5-7 most important points as bullet points
+- Focus on main arguments, findings, or concepts
+- Keep each point concise but informative
+
+🔍 DETAILED BREAKDOWN:
+Organize the content into logical sections with clear headings. For each section:
+• Summarize the main ideas
+• Highlight important details
+• Note any significant data or examples
+
+💡 CORE CONCEPTS:
+Identify and explain 3-5 fundamental concepts or terms that are essential to understanding this document.
+
+📊 ANALYSIS & INSIGHTS:
+- What are the main conclusions or takeaways?
+- Are there any patterns, trends, or relationships worth noting?
+- What makes this content important or valuable?
+
+🎓 LEARNING RECOMMENDATIONS:
+Suggest how someone could best study or use this information, including:
+- Prerequisite knowledge needed
+- Key areas to focus on for understanding
+- Potential applications of this knowledge
+
+Document Content:
+${fileText.substring(0, 8000)} ${fileText.length > 8000 ? '... [document continues]' : ''}
+
+Please make your response well-structured, educational, and easy to follow. Use clear headings and bullet points for readability.`;
 };
 
 
-// ✅ Enhanced content submission detection
-export const isLikelyContentSubmission = (text) => {
-    // Don't mark pleasantries as content submissions
-    if (isPleasantry(text)) return false;
+// ✅ NEW: Function to clean AI response
+export const cleanAIResponse = (response) => {
+    if (!response) return response;
 
-    return text.length > 200 ||
-        (text.includes('\n') && text.length > 50) ||
-        text.includes('http') ||
-        text.toLowerCase().includes('summarize') ||
-        text.toLowerCase().includes('analyze');
-};
+    let cleaned = response;
 
-// ✅ Helper function to generate conversation title
-export const generateConversationTitle = async (firstMessage) => {
-    // For very short messages or questions, create a descriptive title
-    if (firstMessage.length < 50 || firstMessage.endsWith('?')) {
-        const truncated = firstMessage.substring(0, 30);
-        return `${truncated}${firstMessage.length > 30 ? '...' : ''}`;
-    }
+    // Replace escaped newlines ("\\n") with actual newlines
+    cleaned = cleaned.replace(/\\n/g, '\n');
 
-    // For longer content, extract first few meaningful words
-    const words = firstMessage.split(' ').slice(0, 5).join(' ');
-    return `${words}...`;
-};
+    // Collapse 3+ real newlines into 2
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 
-// ✅ Helper function to generate title for content-based conversations
-export const generateContentBasedTitle = async (content) => {
-    // Extract first sentence or first 40 characters as title
-    const firstSentence = content.split('.')[0];
-    if (firstSentence.length > 20 && firstSentence.length < 60) {
-        return firstSentence;
-    }
+    // Also collapse 2 newlines into 1 if you want fewer line breaks:
+    // cleaned = cleaned.replace(/\n{2,}/g, '\n');
 
-    // Fallback: first 40 characters
-    return content.substring(0, 40) + (content.length > 40 ? '...' : '');
+    // Trim leading/trailing whitespace
+    cleaned = cleaned.trim();
+
+    return cleaned;
 };
 
 
-// Helper functions
-export const isQuestion = (text) => {
-    const questionWords = ['what', 'how', 'why', 'when', 'where', 'who', 'explain', 'tell me about', '?'];
-    return questionWords.some(word => text.toLowerCase().includes(word));
-};
 
 
 // ✅ Enhanced prompt crafting with RAG
-export const craftIntelligentPrompt = async (message, context, action) => {
+export const craftIntelligentPrompt = async (message, context, action, isDocumentSubmission = false) => {
     // ✅ Handle pleasantries first
     if (isPleasantry(message)) {
         return `The user said: "${message}". 
         
         Please respond naturally and warmly to this greeting or pleasantry. Keep it friendly, engaging, and appropriate for the context. 
-        If this is the start of a conversation, briefly introduce yourself as a helpful AI assistant and invite them to share what they'd like help with.
+        If this is the start of a conversation, briefly introduce yourself as "Funlearn Genie", a helpful AI assistant and invite them to share what they'd like help with.
         
-        Be conversational and human-like in your response.`;
+        Be conversational and human-like in your response. Use normal paragraph breaks but avoid markdown formatting or special characters.`;
+    }
+
+
+    // ✅ Handle explicit summarization requests
+    if (action === 'summarize' || isDocumentSubmission) {
+        const contentToSummarize = context.originalText || message;
+
+        return `Please analyze and summarize the following content. Provide a comprehensive summary with:
+
+📌 MAIN SUMMARY: 2-5 sentence overview
+🎯 KEY POINTS: Bullet points of important concepts
+💡 CORE CONCEPTS: Fundamental ideas to understand
+🔍 DEEPER INSIGHTS: Interesting observations
+
+Content to analyze:
+${contentToSummarize}
+
+After your analysis, invite the user to ask follow-up questions or request related resources.`;
     }
 
     // If no context exists yet and message is long, assume it's content to summarize
     if (!context.hasSummary && message.length > 200 && !isPleasantry(message)) {
-        // Store the content in Pinecone for future reference (non-blocking)
-        ragService.storeConversationChunks(
-            context._id.toString(),
-            message,
-            { type: 'original_content' }
-        ).catch(console.error);
-
         return `Please analyze and summarize the following content. Provide a comprehensive summary with:
     
             📌 MAIN SUMMARY: 2-5 sentence overview
@@ -197,11 +215,80 @@ export const craftIntelligentPrompt = async (message, context, action) => {
     return `The user says: "${message}". 
     
     Please provide a helpful, engaging, and conversational response. 
-    Be friendly and natural in your tone. If they're starting a general conversation, respond appropriately and ask how you can help them today.`;
+    Be friendly and natural in your tone. If they're starting a general conversation, respond appropriately. Tell them your name is "Funlearn Genie" and ask how you can help them today.`;
+};
+
+
+// ✅ Enhanced content submission detection
+export const isLikelyContentSubmission = (text) => {
+    // Don't mark pleasantries as content submissions
+    if (isPleasantry(text)) return false;
+
+    return text.length > 200 ||
+        (text.includes('\n') && text.length > 50) ||
+        text.includes('http') ||
+        text.toLowerCase().includes('summarize') ||
+        text.toLowerCase().includes('analyze') ||
+        text.toLowerCase().includes('document') ||
+        text.toLowerCase().includes('content');
+};
+
+// ✅ Enhanced pleasantry detection
+export const isPleasantry = (text) => {
+    if (!text) return false;
+
+    const pleasantries = [
+        'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
+        'how are you', 'how do you do', 'nice to meet you', 'greetings',
+        'thanks', 'thank you', 'appreciate it', 'thanks a lot',
+        'bye', 'goodbye', 'see you', 'farewell', 'have a good day'
+    ];
+
+    const cleanText = text.toLowerCase().trim();
+    return pleasantries.some(pleasantry => cleanText.includes(pleasantry));
+};
+
+// ✅ Helper function to generate conversation title
+export const generateConversationTitle = async (firstMessage) => {
+    if (!firstMessage) return "New Conversation";
+
+    // For very short messages or questions, create a descriptive title
+    if (firstMessage.length < 50 || firstMessage.endsWith('?')) {
+        const truncated = firstMessage.substring(0, 30);
+        return `${truncated}${firstMessage.length > 30 ? '...' : ''}`;
+    }
+
+    // For longer content, extract first few meaningful words
+    const words = firstMessage.split(' ').slice(0, 5).join(' ');
+    return `${words}...`;
+};
+
+// ✅ Helper function to generate title for content-based conversations
+export const generateContentBasedTitle = async (content) => {
+    if (!content) return "Document Analysis";
+
+    // Extract first sentence or first 40 characters as title
+    const firstSentence = content.split('.')[0];
+    if (firstSentence.length > 20 && firstSentence.length < 60) {
+        return firstSentence;
+    }
+
+    // Fallback: first 40 characters
+    return content.substring(0, 40) + (content.length > 40 ? '...' : '');
+};
+
+// Helper functions
+export const isQuestion = (text) => {
+    if (!text) return false;
+
+    const questionWords = ['what', 'how', 'why', 'when', 'where', 'who', 'explain', 'tell me about', '?'];
+    return questionWords.some(word => text.toLowerCase().includes(word));
 };
 
 // Helper function to extract topic from message
 export const extractTopic = (message, context) => {
+    if (!message) return context ? context.substring(0, 30) + '...' : 'General Topic';
+
     // Simple topic extraction
     const questionWords = ['what', 'how', 'why', 'when', 'where', 'who', 'explain', 'tell me about'];
     const words = message.toLowerCase().split(' ');
@@ -216,18 +303,26 @@ export const extractTopic = (message, context) => {
     return message.split(' ').slice(0, 5).join(' ').replace('?', '');
 };
 
-
 // ✅ Simple AI-based or rule-based topic extractor
 export const generateChatContextAI = async (message, fileText) => {
+    const content = message || fileText;
+    if (!content) return "General Discussion";
+
     const prompt = `
     Extract a short, clear topic (1-5 words) that best describes the main subject of this text:
     ---
-    ${message || fileText}
+    ${content}
     ---
     Respond with only the topic phrase.`;
 
-    const result = await callGroqAPI([{ role: 'user', content: prompt }]);
-    return result.trim();
+    try {
+        const result = await callGroqAPI([{ role: 'user', content: prompt }]);
+        return result.trim();
+    } catch (error) {
+        console.error("Failed to generate chat context:", error);
+        // Fallback: extract first few words
+        return content.split(' ').slice(0, 3).join(' ') + '...';
+    }
 };
 
 
