@@ -39,7 +39,8 @@ const apis = [
     "https://help-a-child-africa.onrender.com",
     "https://drivenest-se33.onrender.com",
     "https://forever-backend-w1tn.onrender.com",
-    "https://blog-backend-dav9.onrender.com"
+    "https://blog-backend-dav9.onrender.com",
+    "https://studysync-eudf.onrender.com"
 ];
 
 let nextRunInMinutes = getRandomMinutes();
@@ -92,7 +93,8 @@ initPinecone().then(() => {
 app.use(cors({
     origin: [
         process.env.FRONTEND_URL,
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "https://studysync-eudf.onrender.com"
     ],
     credentials: true
 }));
