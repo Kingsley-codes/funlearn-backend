@@ -328,7 +328,7 @@ export const generateChatContextAI = async (message, fileText) => {
 
 export const callGroqAPI = async (messages, options = {}) => {
     const {
-        model = "llama-3.1-70b-versatile",
+        model = "llama-3.1-8b-instant",
         temperature = 0.7,
         max_tokens = 1000,
     } = options;
