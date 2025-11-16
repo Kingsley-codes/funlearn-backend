@@ -529,11 +529,9 @@ export const generateQuestions = async (req, res) => {
 
         if (chatId) {
             const conversation = await Conversation.findById(chatId);
-
             if (!conversation) {
                 return res.status(404).json({ error: "Conversation not found" });
             }
-
             topic = conversation.chatContext;
         } else if (quizTopic) {
             topic = quizTopic;
@@ -541,28 +539,56 @@ export const generateQuestions = async (req, res) => {
             return res.status(400).json({ error: "Quiz Topic must be provided" });
         }
 
-        // 1️⃣ Fetch context for factual grounding
-        const searchRes = await axios.get(
-            `https://api.duckduckgo.com/?q=${encodeURIComponent(topic)}&format=json`
-        );
+        // 1️⃣ Use your existing RAG service to get relevant context
+        let relatedText = "";
 
-        const relatedText =
-            searchRes.data.AbstractText ||
-            searchRes.data.RelatedTopics?.map((t) => t.Text).join(". ") ||
-            "";
+        try {
+            // Search both conversation context and external knowledge
+            const conversationContext = await ragService.searchRelevantContext(topic, chatId, 5);
+            const externalResources = await ragService.searchExternalResources(topic, 3);
 
-        // 2️⃣ Improved prompt with stricter instructions
+            // Combine contexts
+            const contexts = [];
+
+            if (conversationContext) {
+                contexts.push(`CONVERSATION CONTEXT:\n${conversationContext}`);
+            }
+
+            if (externalResources.length > 0) {
+                const externalContext = externalResources
+                    .map(resource => `FROM ${resource.source}:\n${resource.content}`)
+                    .join('\n\n');
+                contexts.push(`KNOWLEDGE BASE:\n${externalContext}`);
+            }
+
+            if (contexts.length > 0) {
+                relatedText = contexts.join('\n\n');
+                console.log(`Retrieved context from ${externalResources.length} external resources and conversation history`);
+            } else {
+                relatedText = `Topic: ${topic}. No specific context found in knowledge base.`;
+                console.log("Using minimal context for topic:", topic);
+            }
+
+        } catch (ragError) {
+            console.warn("RAG context retrieval failed:", ragError.message);
+            // Fallback: use the topic itself as minimal context
+            relatedText = `Topic: ${topic}. Generating questions based on general knowledge.`;
+        }
+
+        // 2️⃣ Improved prompt with RAG context
         const prompt = `
 You are a quiz generator. Generate exactly 20 multiple-choice questions about: "${topic}"
+
+RELEVANT CONTEXT:
+${relatedText.slice(0, 2000)}
 
 CRITICAL REQUIREMENTS:
 - Generate EXACTLY 10 easy questions and EXACTLY 10 hard questions
 - Each question MUST have exactly 5 options (A through E)
 - Each question MUST have a correct answer (A-E) and explanation
-- If you cannot generate enough unique questions, create variations but ensure all 20 questions are complete
-
-CONTEXT FOR ACCURACY:
-${relatedText.slice(0, 1800)}
+- Base questions on the provided context when relevant
+- For easy questions: focus on basic facts, definitions, and straightforward concepts
+- For hard questions: focus on analysis, interpretation, connections, and deeper understanding
 
 OUTPUT FORMAT - STRICT JSON ONLY:
 {
@@ -620,7 +646,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no code blocks, no additional te
                 const aiReply = response.data?.choices?.[0]?.message?.content;
                 if (!aiReply) throw new Error("No response from Groq API");
 
-                // 4️⃣ Parse and validate
+                // Parse and validate
                 parsed = JSON.parse(aiReply);
 
                 // Validate structure
@@ -692,7 +718,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no code blocks, no additional te
             }
         }
 
-        // 5️⃣ Generate token and save to MongoDB
+        // 4️⃣ Generate token and save to MongoDB
         const token = crypto.randomBytes(6).toString("hex");
 
         const newSet = await QuestionSet.create({
@@ -707,10 +733,10 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no code blocks, no additional te
             },
         });
 
-        // 6️⃣ Send success response
+        // 5️⃣ Send success response
         res.status(201).json({
             success: true,
-            message: "Question set generated successfully",
+            message: "Question set generated successfully using RAG context",
             questionSet: newSet,
         });
 
