@@ -1,6 +1,20 @@
 import axios from "axios";
 
 
+// ✅ NEW: Function to detect summarization requests
+export const isSummarizationRequest = (message) => {
+    if (!message) return false;
+
+    const summarizationKeywords = [
+        'summarize', 'summary', 'summarise', 'summarization',
+        'brief', 'overview', 'main points', 'key points',
+        'tl;dr', 'tldr', 'recap', 'outline',
+        'explain briefly', 'give me a summary', 'what are the main ideas'
+    ];
+
+    const cleanMessage = message.toLowerCase().trim();
+    return summarizationKeywords.some(keyword => cleanMessage.includes(keyword));
+};
 
 // ✅ Specialized prompt for document summarization
 export const craftDocumentSummarizationPrompt = async (fileText, context) => {
@@ -325,21 +339,6 @@ export const generateChatContextAI = async (message, fileText) => {
     }
 };
 
-
-// ✅ NEW: Function to detect summarization requests
-export const isSummarizationRequest = (message) => {
-    if (!message) return false;
-
-    const summarizationKeywords = [
-        'summarize', 'summary', 'summarise', 'summarization',
-        'brief', 'overview', 'main points', 'key points',
-        'tl;dr', 'tldr', 'recap', 'outline',
-        'explain briefly', 'give me a summary', 'what are the main ideas'
-    ];
-
-    const cleanMessage = message.toLowerCase().trim();
-    return summarizationKeywords.some(keyword => cleanMessage.includes(keyword));
-};
 
 export const callGroqAPI = async (messages, options = {}) => {
     const {
