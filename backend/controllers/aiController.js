@@ -277,8 +277,8 @@ export const callGroqAPI = async (messages) => {
         // ✅ Create payload with proper validation
         const payload = {
             // Choose one of these current models:
-            model: "llama-3.1-8b-instant", // Fast and efficient
-            // model: "llama-3.1-70b-versatile", // More powerful but slower
+            // model: "llama-3.1-8b-instant", // Fast and efficient
+            model: "llama-3.1-70b-versatile", // More powerful but slower
             // model: "mixtral-8x7b-32768", // Good for complex tasks
             messages: messages, // This should now be a valid array
             temperature: 0.7,
@@ -513,7 +513,7 @@ ${relatedText.slice(0, 1800)}
 
         // 3️⃣ Call Groq API
         const payload = {
-            model: "llama-3.1-8b-instant",
+            model: "llama-3.1-70b-versatile",
             messages: [{ role: "user", content: prompt }],
             temperature: 0.7,
             max_tokens: 3500,
